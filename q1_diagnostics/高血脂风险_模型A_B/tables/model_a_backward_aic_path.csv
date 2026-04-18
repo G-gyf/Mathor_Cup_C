@@ -1,0 +1,7 @@
+﻿模型,步骤,操作,删除变量,AIC,剩余变量,公式
+模型A_含直接血脂指标,0,初始模型,,309.41519788536436,HDL-C（高密度脂蛋白）、LDL-C（低密度脂蛋白）、TG（甘油三酯）、TC（总胆固醇）、空腹血糖、血尿酸、BMI、ADL总分、IADL总分、年龄组、性别、吸烟史、饮酒史,hyperlipidemia ~ hdl_c + ldl_c + tg + tc + fbg + uric_acid + bmi + adl_total + iadl_total + C(age_group) + sex + smoking + drinking
+模型A_含直接血脂指标,1,删除变量,IADL总分,307.43909653099615,HDL-C（高密度脂蛋白）、LDL-C（低密度脂蛋白）、TG（甘油三酯）、TC（总胆固醇）、空腹血糖、血尿酸、BMI、ADL总分、年龄组、性别、吸烟史、饮酒史,hyperlipidemia ~ hdl_c + ldl_c + tg + tc + fbg + uric_acid + bmi + adl_total + C(age_group) + sex + smoking + drinking
+模型A_含直接血脂指标,2,删除变量,空腹血糖,305.761264438955,HDL-C（高密度脂蛋白）、LDL-C（低密度脂蛋白）、TG（甘油三酯）、TC（总胆固醇）、血尿酸、BMI、ADL总分、年龄组、性别、吸烟史、饮酒史,hyperlipidemia ~ hdl_c + ldl_c + tg + tc + uric_acid + bmi + adl_total + C(age_group) + sex + smoking + drinking
+模型A_含直接血脂指标,3,删除变量,BMI,304.2704914060855,HDL-C（高密度脂蛋白）、LDL-C（低密度脂蛋白）、TG（甘油三酯）、TC（总胆固醇）、血尿酸、ADL总分、年龄组、性别、吸烟史、饮酒史,hyperlipidemia ~ hdl_c + ldl_c + tg + tc + uric_acid + adl_total + C(age_group) + sex + smoking + drinking
+模型A_含直接血脂指标,4,删除变量,ADL总分,302.8700912870375,HDL-C（高密度脂蛋白）、LDL-C（低密度脂蛋白）、TG（甘油三酯）、TC（总胆固醇）、血尿酸、年龄组、性别、吸烟史、饮酒史,hyperlipidemia ~ hdl_c + ldl_c + tg + tc + uric_acid + C(age_group) + sex + smoking + drinking
+模型A_含直接血脂指标,5,删除变量,吸烟史,301.8758916280446,HDL-C（高密度脂蛋白）、LDL-C（低密度脂蛋白）、TG（甘油三酯）、TC（总胆固醇）、血尿酸、年龄组、性别、饮酒史,hyperlipidemia ~ hdl_c + ldl_c + tg + tc + uric_acid + C(age_group) + sex + drinking

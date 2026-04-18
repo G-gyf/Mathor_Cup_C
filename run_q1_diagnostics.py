@@ -13,18 +13,25 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import statsmodels.api as sm
+import statsmodels.formula.api as smf
 from scipy import stats
 from statsmodels.stats.diagnostic import linear_reset
+from statsmodels.stats.outliers_influence import variance_inflation_factor
 
 
 ROOT = Path(__file__).resolve().parent
 D1_PATH = ROOT / "Q1_D1_异常值标记数据.csv"
 D2_PATH = ROOT / "Q1_D2_缩尾数据.csv"
+D2_PREPROCESSED_PATH = ROOT / "Q1_D2_预处理结果.csv"
 OUTPUT_DIR = ROOT / "q1_diagnostics"
 SCATTER_DIR = OUTPUT_DIR / "figures" / "scatter_lowess"
 BOXPLOT_DIR = OUTPUT_DIR / "figures" / "boxplots"
 HEATMAP_DIR = OUTPUT_DIR / "figures" / "heatmaps"
 TABLE_DIR = OUTPUT_DIR / "tables"
+RCS_DIR = OUTPUT_DIR / "figures" / "rcs_effects"
+RCS_PREPROCESSED_DIR = OUTPUT_DIR / "figures" / "rcs_effects_preprocessed"
+SEVERITY_SUMMARY_PATH = OUTPUT_DIR / "Q1_体质严重度表征模型结果汇总.md"
+SEVERITY_PREPROCESSED_SUMMARY_PATH = OUTPUT_DIR / "Q1_体质严重度表征模型结果汇总_预处理版.md"
 
 Y_COL = "痰湿质"
 CONTINUOUS_VARS = [
@@ -78,12 +85,26 @@ def configure_plotting() -> None:
 
 
 def ensure_output_dirs() -> None:
-    for path in [SCATTER_DIR, BOXPLOT_DIR, HEATMAP_DIR, TABLE_DIR]:
+    for path in [SCATTER_DIR, BOXPLOT_DIR, HEATMAP_DIR, TABLE_DIR, RCS_DIR, RCS_PREPROCESSED_DIR]:
         path.mkdir(parents=True, exist_ok=True)
 
 
 def load_csv(path: Path) -> pd.DataFrame:
     return pd.read_csv(path, encoding="utf-8-sig")
+
+
+def df_to_markdown(df: pd.DataFrame) -> str:
+    df_fmt = df.copy()
+    for column in df_fmt.columns:
+        if pd.api.types.is_float_dtype(df_fmt[column]):
+            df_fmt[column] = df_fmt[column].map(lambda value: f"{value:.4f}")
+    header = "| " + " | ".join(map(str, df_fmt.columns)) + " |"
+    divider = "| " + " | ".join(["---"] * len(df_fmt.columns)) + " |"
+    rows = [
+        "| " + " | ".join(map(str, row)) + " |"
+        for row in df_fmt.astype(str).itertuples(index=False, name=None)
+    ]
+    return "\n".join([header, divider] + rows)
 
 
 def validate_inputs(d1: pd.DataFrame, d2: pd.DataFrame) -> pd.DataFrame:
@@ -448,6 +469,459 @@ def reset_analysis(d2: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     return reset_table, coef_table
 
 
+def vif_risk_label(vif: float, tolerance: float) -> tuple[str, str]:
+    if vif >= 10 or tolerance <= 0.1:
+        return "是", "存在严重多重共线性风险"
+    if vif >= 5 or tolerance <= 0.2:
+        return "是", "存在中度多重共线性风险"
+    return "否", "未发现明显多重共线性"
+
+
+def multicollinearity_analysis(d2: pd.DataFrame) -> pd.DataFrame:
+    x = sm.add_constant(d2[ALL_VARS].astype(float))
+    rows = []
+    for index, column in enumerate(x.columns):
+        if column == "const":
+            continue
+        vif = float(variance_inflation_factor(x.values, index))
+        tolerance = 1.0 / vif if vif != 0 else np.nan
+        exceeds, conclusion = vif_risk_label(vif, tolerance)
+        rows.append(
+            {
+                "变量名": column,
+                "VIF": vif,
+                "Tolerance": tolerance,
+                "是否超过阈值": exceeds,
+                "结论": conclusion,
+            }
+        )
+    vif_df = pd.DataFrame(rows).sort_values(by="VIF", ascending=False)
+    vif_df.to_csv(TABLE_DIR / "multicollinearity_vif_results.csv", index=False, encoding="utf-8-sig")
+    return vif_df
+
+
+def prepare_modeling_data(d2: pd.DataFrame) -> pd.DataFrame:
+    return d2[[Y_COL] + ALL_VARS].rename(columns=RESET_NAME_MAP).copy()
+
+
+def compute_rmse(model: sm.regression.linear_model.RegressionResultsWrapper) -> float:
+    return float(np.sqrt(np.mean(np.square(model.resid))))
+
+
+def compute_rcs_knots(model_input: pd.DataFrame, output_path: Path) -> pd.DataFrame:
+    quantiles = [0.05, 0.35, 0.65, 0.95]
+    rows = []
+    for variable in ALL_VARS:
+        values = model_input[variable].quantile(quantiles)
+        rows.append(
+            {
+                "变量名": variable,
+                "别名": RESET_NAME_MAP[variable],
+                "knot_5%": float(values.loc[0.05]),
+                "knot_35%": float(values.loc[0.35]),
+                "knot_65%": float(values.loc[0.65]),
+                "knot_95%": float(values.loc[0.95]),
+            }
+        )
+    knots_df = pd.DataFrame(rows)
+    knots_df.to_csv(output_path, index=False, encoding="utf-8-sig")
+    return knots_df
+
+
+def format_float(value: float) -> str:
+    return f"{float(value):.12g}"
+
+
+def build_rcs_term(alias: str, knot_row: pd.Series) -> str:
+    return (
+        f"cr({alias}, "
+        f"knots=({format_float(knot_row['knot_35%'])}, {format_float(knot_row['knot_65%'])}), "
+        f"lower_bound={format_float(knot_row['knot_5%'])}, "
+        f"upper_bound={format_float(knot_row['knot_95%'])})"
+    )
+
+
+def build_rcs_formula(knots_df: pd.DataFrame, linear_overrides: set[str] | None = None, drop_alias: str | None = None) -> str:
+    linear_overrides = linear_overrides or set()
+    knot_map = knots_df.set_index("别名")
+    terms = []
+    for variable in ALL_VARS:
+        alias = RESET_NAME_MAP[variable]
+        if alias == drop_alias:
+            continue
+        if alias in linear_overrides:
+            terms.append(alias)
+        else:
+            terms.append(build_rcs_term(alias, knot_map.loc[alias]))
+    return f"{RESET_NAME_MAP[Y_COL]} ~ " + " + ".join(terms)
+
+
+def model_fit_row(name: str, data_source: str, model: sm.regression.linear_model.RegressionResultsWrapper) -> dict[str, float | str]:
+    return {
+        "模型": name,
+        "数据源": data_source,
+        "n": int(model.nobs),
+        "R2": float(model.rsquared),
+        "调整R2": float(model.rsquared_adj),
+        "AIC": float(model.aic),
+        "BIC": float(model.bic),
+        "RMSE": compute_rmse(model),
+    }
+
+
+def fit_severity_models(
+    model_input: pd.DataFrame,
+    data_source: str,
+    suffix: str = "",
+) -> tuple[
+    sm.regression.linear_model.RegressionResultsWrapper,
+    sm.regression.linear_model.RegressionResultsWrapper,
+    pd.DataFrame,
+    pd.DataFrame,
+    pd.DataFrame,
+]:
+    model_df = prepare_modeling_data(model_input)
+    knots_df = compute_rcs_knots(model_input, TABLE_DIR / f"rcs_knots_table{suffix}.csv")
+
+    ols_formula = f"{RESET_NAME_MAP[Y_COL]} ~ " + " + ".join(RESET_NAME_MAP[var] for var in ALL_VARS)
+    ols_model = smf.ols(ols_formula, data=model_df).fit()
+    rcs_formula = build_rcs_formula(knots_df)
+    rcs_model = smf.ols(rcs_formula, data=model_df).fit()
+
+    fit_table = pd.DataFrame(
+        [
+            model_fit_row("OLS基线模型", data_source, ols_model),
+            model_fit_row("RCS全变量模型", data_source, rcs_model),
+        ]
+    )
+    fit_table.to_csv(TABLE_DIR / f"rcs_model_fit_comparison{suffix}.csv", index=False, encoding="utf-8-sig")
+
+    coef_table = (
+        pd.DataFrame(
+            {
+                "变量名": [Y_COL if name == "Intercept" else next((cn for cn, alias in RESET_NAME_MAP.items() if alias == name), name) for name in ols_model.params.index],
+                "系数": ols_model.params.values,
+                "标准误": ols_model.bse.values,
+                "t值": ols_model.tvalues.values,
+                "p值": ols_model.pvalues.values,
+                "下限95CI": ols_model.conf_int()[0].values,
+                "上限95CI": ols_model.conf_int()[1].values,
+            }
+        )
+        .replace({"变量名": {Y_COL: "截距"}})
+    )
+    coef_table.to_csv(TABLE_DIR / f"ols_severity_coefficients{suffix}.csv", index=False, encoding="utf-8-sig")
+
+    ols_summary = pd.DataFrame([model_fit_row("OLS基线模型", data_source, ols_model)])
+    ols_summary.to_csv(TABLE_DIR / f"ols_severity_model_summary{suffix}.csv", index=False, encoding="utf-8-sig")
+
+    with (TABLE_DIR / f"rcs_model_summary{suffix}.txt").open("w", encoding="utf-8") as handle:
+        handle.write(rcs_model.summary().as_text())
+    with (TABLE_DIR / f"ols_severity_model_summary{suffix}.txt").open("w", encoding="utf-8") as handle:
+        handle.write(ols_model.summary().as_text())
+
+    return ols_model, rcs_model, fit_table, knots_df, model_df
+
+
+def safe_compare_f_test(
+    full_model: sm.regression.linear_model.RegressionResultsWrapper,
+    reduced_model: sm.regression.linear_model.RegressionResultsWrapper,
+) -> tuple[float, float, float]:
+    f_stat, p_value, df_diff = full_model.compare_f_test(reduced_model)
+    return float(f_stat), float(p_value), float(df_diff)
+
+
+def classify_rcs_shape(x_values: np.ndarray, y_values: np.ndarray) -> str:
+    if len(x_values) < 5:
+        return "近似线性"
+
+    curve_range = float(np.max(y_values) - np.min(y_values))
+    if curve_range < 1e-6:
+        return "平台"
+
+    straight_line = np.linspace(y_values[0], y_values[-1], len(y_values))
+    deviation_ratio = float(np.mean(np.abs(y_values - straight_line)) / max(curve_range, 1e-8))
+    first_diff = np.diff(y_values)
+    tol = max(np.quantile(np.abs(first_diff), 0.2), curve_range * 0.01, 1e-6)
+    pos = first_diff > tol
+    neg = first_diff < -tol
+
+    if not neg.any() or not pos.any():
+        edge = max(int(len(first_diff) * 0.2), 1)
+        start_mean = float(np.mean(np.abs(first_diff[:edge])))
+        mid_left = max(int(len(first_diff) * 0.4), 1)
+        mid_right = min(int(len(first_diff) * 0.6), len(first_diff))
+        mid_mean = float(np.mean(np.abs(first_diff[mid_left:mid_right])))
+        end_mean = float(np.mean(np.abs(first_diff[-edge:])))
+
+        if deviation_ratio < 0.05:
+            return "近似线性"
+        if mid_mean < 0.35 * max(start_mean, end_mean, 1e-6):
+            return "存在平台"
+        if max(start_mean, end_mean) > 3 * min(max(start_mean, 1e-6), max(end_mean, 1e-6)):
+            return "存在阈值"
+        return "单调上升" if np.mean(first_diff) >= 0 else "单调下降"
+
+    sign_series = np.sign(first_diff[np.abs(first_diff) > tol])
+    sign_changes = int(np.sum(sign_series[1:] != sign_series[:-1])) if sign_series.size > 1 else 0
+    second_diff_mean = float(np.mean(np.diff(y_values, n=2)))
+
+    if sign_changes <= 1:
+        if second_diff_mean > 0:
+            return "U型"
+        if second_diff_mean < 0:
+            return "倒U型"
+    return "局部转折"
+
+
+def build_prediction_frame(model_df: pd.DataFrame, alias: str, grid: np.ndarray) -> pd.DataFrame:
+    medians = model_df[[RESET_NAME_MAP[var] for var in ALL_VARS]].median()
+    prediction_df = pd.DataFrame([medians.to_dict()] * len(grid))
+    prediction_df[alias] = grid
+    return prediction_df
+
+
+def test_rcs_variables(
+    model_input: pd.DataFrame,
+    model_df: pd.DataFrame,
+    knots_df: pd.DataFrame,
+    ols_model: sm.regression.linear_model.RegressionResultsWrapper,
+    rcs_model: sm.regression.linear_model.RegressionResultsWrapper,
+    suffix: str = "",
+) -> pd.DataFrame:
+    rows = []
+    knot_lookup = knots_df.set_index("变量名")
+
+    for variable in ALL_VARS:
+        alias = RESET_NAME_MAP[variable]
+
+        reduced_formula = build_rcs_formula(knots_df, drop_alias=alias)
+        reduced_model = smf.ols(reduced_formula, data=model_df).fit()
+        overall_f, overall_p, overall_df = safe_compare_f_test(rcs_model, reduced_model)
+
+        linear_formula = build_rcs_formula(knots_df, linear_overrides={alias})
+        linear_model = smf.ols(linear_formula, data=model_df).fit()
+        nonlinear_f, nonlinear_p, nonlinear_df = safe_compare_f_test(rcs_model, linear_model)
+
+        grid = np.linspace(float(model_input[variable].min()), float(model_input[variable].max()), 200)
+        prediction_df = build_prediction_frame(model_df, alias, grid)
+        pred = rcs_model.get_prediction(prediction_df).summary_frame(alpha=0.05)
+        mean_curve = pred["mean"].to_numpy(dtype=float)
+        shape_label = classify_rcs_shape(grid, mean_curve)
+
+        ols_coef = float(ols_model.params[alias])
+        is_key = overall_p < 0.05
+        if overall_p < 0.05 and nonlinear_p < 0.05:
+            key_type = "关键非线性指标"
+        elif overall_p < 0.05:
+            key_type = "关键表征指标"
+        else:
+            key_type = "非关键指标"
+
+        rows.append(
+            {
+                "变量名": variable,
+                "OLS线性系数": ols_coef,
+                "OLS方向": "正向" if ols_coef > 0 else ("负向" if ols_coef < 0 else "近零"),
+                "总体效应F值": overall_f,
+                "总体效应自由度差": overall_df,
+                "总体效应P值": overall_p,
+                "非线性F值": nonlinear_f,
+                "非线性自由度差": nonlinear_df,
+                "非线性P值": nonlinear_p,
+                "RCS形态标签": shape_label,
+                "是否列为关键指标": "是" if is_key else "否",
+                "指标类型": key_type,
+                "结点5%": float(knot_lookup.loc[variable, "knot_5%"]),
+                "结点35%": float(knot_lookup.loc[variable, "knot_35%"]),
+                "结点65%": float(knot_lookup.loc[variable, "knot_65%"]),
+                "结点95%": float(knot_lookup.loc[variable, "knot_95%"]),
+            }
+        )
+    variable_tests = pd.DataFrame(rows).sort_values(by=["是否列为关键指标", "总体效应P值"], ascending=[False, True])
+    variable_tests.to_csv(TABLE_DIR / f"rcs_variable_tests{suffix}.csv", index=False, encoding="utf-8-sig")
+    return variable_tests
+
+
+def plot_rcs_effects(
+    model_input: pd.DataFrame,
+    model_df: pd.DataFrame,
+    knots_df: pd.DataFrame,
+    rcs_model: sm.regression.linear_model.RegressionResultsWrapper,
+    variable_tests: pd.DataFrame,
+    output_dir: Path,
+    suffix_label: str = "",
+) -> None:
+    knot_lookup = knots_df.set_index("变量名")
+    test_lookup = variable_tests.set_index("变量名")
+
+    for variable in ALL_VARS:
+        alias = RESET_NAME_MAP[variable]
+        grid = np.linspace(float(model_input[variable].min()), float(model_input[variable].max()), 200)
+        prediction_df = build_prediction_frame(model_df, alias, grid)
+        pred = rcs_model.get_prediction(prediction_df).summary_frame(alpha=0.05)
+
+        fig, ax = plt.subplots(figsize=(9, 6))
+        ax.plot(grid, pred["mean"], color="#2C7FB8", linewidth=2.4, label="RCS拟合均值")
+        ax.fill_between(
+            grid,
+            pred["mean_ci_lower"],
+            pred["mean_ci_upper"],
+            color="#A6CEE3",
+            alpha=0.35,
+            label="95% CI",
+        )
+        knot_row = knot_lookup.loc[variable]
+        for label, knot_col in [("5%", "knot_5%"), ("35%", "knot_35%"), ("65%", "knot_65%"), ("95%", "knot_95%")]:
+            ax.axvline(float(knot_row[knot_col]), color="#F58518", linestyle="--", linewidth=1)
+            ax.text(
+                float(knot_row[knot_col]),
+                float(np.max(pred["mean_ci_upper"])),
+                label,
+                rotation=90,
+                va="top",
+                ha="right",
+                color="#F58518",
+            )
+
+        label_row = test_lookup.loc[variable]
+        ax.set_xlabel(variable)
+        ax.set_ylabel("预测痰湿质积分")
+        title_suffix = f"（{suffix_label}）" if suffix_label else ""
+        ax.set_title(f"{variable} 的 RCS偏效应曲线{title_suffix}")
+        ax.text(
+            0.02,
+            0.98,
+            (
+                f"形态：{label_row['RCS形态标签']}\n"
+                f"总体效应P={label_row['总体效应P值']:.4f}\n"
+                f"非线性P={label_row['非线性P值']:.4f}"
+            ),
+            transform=ax.transAxes,
+            va="top",
+            ha="left",
+            bbox={"boxstyle": "round", "facecolor": "white", "alpha": 0.9},
+        )
+        ax.legend(frameon=True)
+        fig.tight_layout()
+        fig.savefig(output_dir / f"rcs_effect_{sanitize_filename(variable)}.png", dpi=220, bbox_inches="tight")
+        plt.close(fig)
+
+
+def generate_severity_summary_markdown(
+    fit_table: pd.DataFrame,
+    variable_tests: pd.DataFrame,
+    knots_df: pd.DataFrame,
+    summary_path: Path,
+    data_source: str,
+    effect_dir_label: str,
+    suffix: str = "",
+) -> None:
+    key_indicators = variable_tests[variable_tests["是否列为关键指标"] == "是"]
+    if key_indicators.empty:
+        key_text = "当前全模型下未识别出总体效应显著的关键指标，说明现有 9 个指标对痰湿质积分的解释信号整体较弱。"
+    else:
+        key_text = "识别出的关键指标如下：" + "、".join(key_indicators["变量名"].tolist()) + "。"
+
+    rcs_row = fit_table.loc[fit_table["模型"] == "RCS全变量模型"].iloc[0]
+    ols_row = fit_table.loc[fit_table["模型"] == "OLS基线模型"].iloc[0]
+    gain_text = (
+        f"RCS相较OLS的调整R2变化为 {rcs_row['调整R2'] - ols_row['调整R2']:.4f}，"
+        f"AIC变化为 {rcs_row['AIC'] - ols_row['AIC']:.4f}，"
+        f"RMSE变化为 {rcs_row['RMSE'] - ols_row['RMSE']:.4f}。"
+    )
+
+    lines = [
+        "# 第1题体质严重度表征模型结果汇总",
+        "",
+        "## 建模口径",
+        "- 因变量：`痰湿质`",
+        f"- 数据源：`{data_source}`",
+        "- 自变量：7 个代谢/血常规指标 + `ADL总分` + `IADL总分`",
+        "- OLS 作为线性基线模型，RCS 作为函数形态与非线性检验工具",
+        "- RCS 全部变量统一使用 4 结点，结点分位点固定为 `5% / 35% / 65% / 95%`",
+        "",
+        "## 模型拟合对比",
+        df_to_markdown(fit_table),
+        "",
+        gain_text,
+        "",
+        "## 变量总体效应与非线性检验",
+        df_to_markdown(
+            variable_tests[
+                [
+                    "变量名",
+                    "OLS线性系数",
+                    "总体效应P值",
+                    "非线性P值",
+                    "RCS形态标签",
+                    "是否列为关键指标",
+                    "指标类型",
+                ]
+            ]
+        ),
+        "",
+        key_text,
+        "",
+        "## RCS结点表",
+        df_to_markdown(knots_df),
+        "",
+        "## 输出文件",
+        f"- OLS结果表：`q1_diagnostics/tables/ols_severity_model_summary{suffix}.csv`、`q1_diagnostics/tables/ols_severity_coefficients{suffix}.csv`",
+        f"- RCS拟合对比：`q1_diagnostics/tables/rcs_model_fit_comparison{suffix}.csv`",
+        f"- 变量检验：`q1_diagnostics/tables/rcs_variable_tests{suffix}.csv`",
+        f"- 结点表：`q1_diagnostics/tables/rcs_knots_table{suffix}.csv`",
+        f"- RCS偏效应图：`{effect_dir_label}`",
+        "",
+        "## 解释提醒",
+        "- 该模型体系用于表征痰湿质严重度的函数形态和关键指标，不应表述为高精度预测模型。",
+        "- 若总体效应不显著，仅可作为形态观察，不宜写成明确的实质性影响结论。",
+    ]
+    summary_path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def run_severity_workflow(
+    model_input: pd.DataFrame,
+    data_source: str,
+    suffix: str,
+    effect_dir: Path,
+    summary_path: Path,
+    effect_dir_label: str,
+    summary_label: str,
+) -> None:
+    ols_model, rcs_model, fit_table, knots_df, model_df = fit_severity_models(
+        model_input=model_input,
+        data_source=data_source,
+        suffix=suffix,
+    )
+    variable_tests = test_rcs_variables(
+        model_input=model_input,
+        model_df=model_df,
+        knots_df=knots_df,
+        ols_model=ols_model,
+        rcs_model=rcs_model,
+        suffix=suffix,
+    )
+    plot_rcs_effects(
+        model_input=model_input,
+        model_df=model_df,
+        knots_df=knots_df,
+        rcs_model=rcs_model,
+        variable_tests=variable_tests,
+        output_dir=effect_dir,
+        suffix_label=summary_label,
+    )
+    generate_severity_summary_markdown(
+        fit_table=fit_table,
+        variable_tests=variable_tests,
+        knots_df=knots_df,
+        summary_path=summary_path,
+        data_source=data_source,
+        effect_dir_label=effect_dir_label,
+        suffix=suffix,
+    )
+
+
 def write_shape_summary(shapes: list[ShapeAssessment]) -> pd.DataFrame:
     shape_df = pd.DataFrame([shape.__dict__ for shape in shapes]).rename(
         columns={
@@ -472,20 +946,8 @@ def generate_summary_markdown(
     pearson_df: pd.DataFrame,
     spearman_df: pd.DataFrame,
     reset_df: pd.DataFrame,
+    vif_df: pd.DataFrame,
 ) -> None:
-    def df_to_markdown(df: pd.DataFrame) -> str:
-        df_fmt = df.copy()
-        for column in df_fmt.columns:
-            if pd.api.types.is_float_dtype(df_fmt[column]):
-                df_fmt[column] = df_fmt[column].map(lambda value: f"{value:.4f}")
-        header = "| " + " | ".join(map(str, df_fmt.columns)) + " |"
-        divider = "| " + " | ".join(["---"] * len(df_fmt.columns)) + " |"
-        rows = [
-            "| " + " | ".join(map(str, row)) + " |"
-            for row in df_fmt.astype(str).itertuples(index=False, name=None)
-        ]
-        return "\n".join([header, divider] + rows)
-
     lines = [
         "# 第1题前置检验结果汇总",
         "",
@@ -512,6 +974,13 @@ def generate_summary_markdown(
         "## RESET 结果",
         df_to_markdown(reset_df),
         "",
+        "## 多重共线性诊断",
+        "- 数据源：`Q1_D2_缩尾数据.csv`",
+        "- 变量范围：7 个代谢/血常规指标 + `ADL总分` + `IADL总分`",
+        "- 主表报告 `VIF` 和 `Tolerance`，阈值规则为 `VIF<5` 视为无明显风险。",
+        "",
+        df_to_markdown(vif_df),
+        "",
         "## 输出文件",
         "- 散点图 + LOWESS：`q1_diagnostics/figures/scatter_lowess/`",
         "- 箱线图：`q1_diagnostics/figures/boxplots/`",
@@ -527,6 +996,7 @@ def main() -> None:
 
     d1 = load_csv(D1_PATH)
     d2 = load_csv(D2_PATH)
+    d2_preprocessed = load_csv(D2_PREPROCESSED_PATH)
     validation = validate_inputs(d1, d2)
     shapes = scatter_and_lowess_plots(d1)
     shape_df = write_shape_summary(shapes)
@@ -535,7 +1005,26 @@ def main() -> None:
     pearson_df = pearson_analysis(d1)
     spearman_df = spearman_analysis(d1)
     reset_df, _ = reset_analysis(d2)
-    generate_summary_markdown(validation, shape_df, boxplot_df, pearson_df, spearman_df, reset_df)
+    vif_df = multicollinearity_analysis(d2)
+    generate_summary_markdown(validation, shape_df, boxplot_df, pearson_df, spearman_df, reset_df, vif_df)
+    run_severity_workflow(
+        model_input=d2,
+        data_source="Q1_D2_缩尾数据.csv",
+        suffix="",
+        effect_dir=RCS_DIR,
+        summary_path=SEVERITY_SUMMARY_PATH,
+        effect_dir_label="q1_diagnostics/figures/rcs_effects/",
+        summary_label="原尺度版",
+    )
+    run_severity_workflow(
+        model_input=d2_preprocessed,
+        data_source="Q1_D2_预处理结果.csv",
+        suffix="_preprocessed",
+        effect_dir=RCS_PREPROCESSED_DIR,
+        summary_path=SEVERITY_PREPROCESSED_SUMMARY_PATH,
+        effect_dir_label="q1_diagnostics/figures/rcs_effects_preprocessed/",
+        summary_label="预处理版",
+    )
 
     print("Q1 diagnostics completed.")
     print(f"Output directory: {OUTPUT_DIR}")

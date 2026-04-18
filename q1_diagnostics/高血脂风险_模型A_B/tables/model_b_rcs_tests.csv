@@ -1,0 +1,2 @@
+﻿模型,变量,线性模型公式,样条模型公式,LR统计量,自由度差,p值,是否显著非线性,曲线形态
+模型B_不含直接血脂指标,血尿酸,hyperlipidemia ~ uric_acid + C(age_group) + smoking,"hyperlipidemia ~ cr(uric_acid, knots=(280.3, 425), lower_bound=104.95, upper_bound=539.1) + C(age_group) + smoking",294.2190531312008,2.0,1.2916485988064306e-64,是,U型

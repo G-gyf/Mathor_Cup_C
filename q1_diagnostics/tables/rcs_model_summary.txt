@@ -1,0 +1,62 @@
+                            OLS Regression Results                            
+==============================================================================
+Dep. Variable:        phlegm_dampness   R-squared:                       0.024
+Model:                            OLS   Adj. R-squared:                 -0.003
+Method:                 Least Squares   F-statistic:                    0.8770
+Date:                Sun, 19 Apr 2026   Prob (F-statistic):              0.647
+Time:                        04:04:21   Log-Likelihood:                -4408.7
+No. Observations:                1000   AIC:                             8873.
+Df Residuals:                     972   BIC:                             9011.
+Df Model:                          27                                         
+Covariance Type:            nonrobust                                         
+=======================================================================================================================================================
+                                                                                          coef    std err          t      P>|t|      [0.025      0.975]
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+Intercept                                                                               9.6850      0.306     31.689      0.000       9.085      10.285
+cr(hdl_c, knots=(1.218225, 1.4029), lower_bound=0.877855, upper_bound=1.718055)[0]      1.2757      1.348      0.946      0.344      -1.370       3.922
+cr(hdl_c, knots=(1.218225, 1.4029), lower_bound=0.877855, upper_bound=1.718055)[1]      2.9875      0.953      3.135      0.002       1.118       4.857
+cr(hdl_c, knots=(1.218225, 1.4029), lower_bound=0.877855, upper_bound=1.718055)[2]      3.3631      0.929      3.620      0.000       1.540       5.186
+cr(hdl_c, knots=(1.218225, 1.4029), lower_bound=0.877855, upper_bound=1.718055)[3]      2.0587      1.321      1.559      0.119      -0.533       4.650
+cr(ldl_c, knots=(2.404, 2.84134), lower_bound=1.59238, upper_bound=3.594205)[0]         1.7159      1.367      1.255      0.210      -0.967       4.399
+cr(ldl_c, knots=(2.404, 2.84134), lower_bound=1.59238, upper_bound=3.594205)[1]         2.3308      0.952      2.449      0.014       0.463       4.198
+cr(ldl_c, knots=(2.404, 2.84134), lower_bound=1.59238, upper_bound=3.594205)[2]         2.1177      0.936      2.264      0.024       0.282       3.954
+cr(ldl_c, knots=(2.404, 2.84134), lower_bound=1.59238, upper_bound=3.594205)[3]         3.5205      1.340      2.627      0.009       0.891       6.150
+cr(tg, knots=(1.28712, 2.222725), lower_bound=0.57031, upper_bound=3.7214)[0]           2.8140      1.271      2.214      0.027       0.320       5.308
+cr(tg, knots=(1.28712, 2.222725), lower_bound=0.57031, upper_bound=3.7214)[1]           3.1238      1.011      3.089      0.002       1.139       5.108
+cr(tg, knots=(1.28712, 2.222725), lower_bound=0.57031, upper_bound=3.7214)[2]           3.0776      1.214      2.534      0.011       0.694       5.461
+cr(tg, knots=(1.28712, 2.222725), lower_bound=0.57031, upper_bound=3.7214)[3]           0.6696      1.548      0.433      0.665      -2.368       3.707
+cr(tc, knots=(4.897815, 6.837405), lower_bound=3.092535, upper_bound=8.684835)[0]       3.9729      1.314      3.023      0.003       1.394       6.552
+cr(tc, knots=(4.897815, 6.837405), lower_bound=3.092535, upper_bound=8.684835)[1]       2.4116      1.080      2.234      0.026       0.293       4.530
+cr(tc, knots=(4.897815, 6.837405), lower_bound=3.092535, upper_bound=8.684835)[2]       1.7047      1.186      1.438      0.151      -0.622       4.031
+cr(tc, knots=(4.897815, 6.837405), lower_bound=3.092535, upper_bound=8.684835)[3]       1.5957      1.474      1.082      0.279      -1.298       4.489
+cr(fbg, knots=(4.590795, 5.37814), lower_bound=3.30692, upper_bound=6.58251)[0]         2.1661      1.359      1.594      0.111      -0.500       4.832
+cr(fbg, knots=(4.590795, 5.37814), lower_bound=3.30692, upper_bound=6.58251)[1]         3.3615      0.979      3.432      0.001       1.440       5.283
+cr(fbg, knots=(4.590795, 5.37814), lower_bound=3.30692, upper_bound=6.58251)[2]         2.8671      0.957      2.997      0.003       0.990       4.744
+cr(fbg, knots=(4.590795, 5.37814), lower_bound=3.30692, upper_bound=6.58251)[3]         1.2902      1.321      0.977      0.329      -1.301       3.882
+cr(uric_acid, knots=(280.3, 425), lower_bound=104.95, upper_bound=539.1)[0]             3.2915      1.448      2.272      0.023       0.449       6.134
+cr(uric_acid, knots=(280.3, 425), lower_bound=104.95, upper_bound=539.1)[1]             1.1348      1.292      0.878      0.380      -1.401       3.671
+cr(uric_acid, knots=(280.3, 425), lower_bound=104.95, upper_bound=539.1)[2]             3.2508      1.082      3.004      0.003       1.127       5.374
+cr(uric_acid, knots=(280.3, 425), lower_bound=104.95, upper_bound=539.1)[3]             2.0078      1.484      1.353      0.176      -0.905       4.921
+cr(bmi, knots=(20.89362, 23.074325), lower_bound=17.11443, upper_bound=26.89429)[0]     1.7480      1.332      1.312      0.190      -0.866       4.362
+cr(bmi, knots=(20.89362, 23.074325), lower_bound=17.11443, upper_bound=26.89429)[1]     3.9604      0.929      4.262      0.000       2.137       5.784
+cr(bmi, knots=(20.89362, 23.074325), lower_bound=17.11443, upper_bound=26.89429)[2]     1.8786      0.973      1.930      0.054      -0.031       3.788
+cr(bmi, knots=(20.89362, 23.074325), lower_bound=17.11443, upper_bound=26.89429)[3]     2.0980      1.430      1.467      0.143      -0.709       4.905
+cr(adl_total, knots=(22, 28), lower_bound=13, upper_bound=36)[0]                        0.9569      1.434      0.667      0.505      -1.857       3.771
+cr(adl_total, knots=(22, 28), lower_bound=13, upper_bound=36)[1]                        5.6664      1.008      5.623      0.000       3.689       7.644
+cr(adl_total, knots=(22, 28), lower_bound=13, upper_bound=36)[2]                        2.3200      1.019      2.276      0.023       0.320       4.320
+cr(adl_total, knots=(22, 28), lower_bound=13, upper_bound=36)[3]                        0.7417      1.379      0.538      0.591      -1.964       3.448
+cr(iadl_total, knots=(22, 28), lower_bound=14, upper_bound=37)[0]                       1.2094      1.244      0.972      0.331      -1.231       3.650
+cr(iadl_total, knots=(22, 28), lower_bound=14, upper_bound=37)[1]                       2.8480      0.956      2.978      0.003       0.971       4.725
+cr(iadl_total, knots=(22, 28), lower_bound=14, upper_bound=37)[2]                       3.2301      1.029      3.139      0.002       1.210       5.250
+cr(iadl_total, knots=(22, 28), lower_bound=14, upper_bound=37)[3]                       2.3975      1.442      1.662      0.097      -0.433       5.228
+==============================================================================
+Omnibus:                      838.093   Durbin-Watson:                   2.005
+Prob(Omnibus):                  0.000   Jarque-Bera (JB):               64.472
+Skew:                           0.132   Prob(JB):                     1.00e-14
+Kurtosis:                       1.785   Cond. No.                     1.39e+16
+==============================================================================
+
+Notes:
+[1] Standard Errors assume that the covariance matrix of the errors is correctly specified.
+[2] The smallest eigenvalue is 1.83e-29. This might indicate that there are
+strong multicollinearity problems or that the design matrix is singular.

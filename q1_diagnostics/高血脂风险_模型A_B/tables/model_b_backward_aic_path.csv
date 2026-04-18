@@ -1,0 +1,8 @@
+﻿模型,步骤,操作,删除变量,AIC,剩余变量,公式
+模型B_不含直接血脂指标,0,初始模型,,999.892521362666,空腹血糖、血尿酸、BMI、ADL总分、IADL总分、年龄组、性别、吸烟史、饮酒史,hyperlipidemia ~ fbg + uric_acid + bmi + adl_total + iadl_total + C(age_group) + sex + smoking + drinking
+模型B_不含直接血脂指标,1,删除变量,IADL总分,997.921590168877,空腹血糖、血尿酸、BMI、ADL总分、年龄组、性别、吸烟史、饮酒史,hyperlipidemia ~ fbg + uric_acid + bmi + adl_total + C(age_group) + sex + smoking + drinking
+模型B_不含直接血脂指标,2,删除变量,BMI,996.5982275647277,空腹血糖、血尿酸、ADL总分、年龄组、性别、吸烟史、饮酒史,hyperlipidemia ~ fbg + uric_acid + adl_total + C(age_group) + sex + smoking + drinking
+模型B_不含直接血脂指标,3,删除变量,性别,995.3401588473444,空腹血糖、血尿酸、ADL总分、年龄组、吸烟史、饮酒史,hyperlipidemia ~ fbg + uric_acid + adl_total + C(age_group) + smoking + drinking
+模型B_不含直接血脂指标,4,删除变量,ADL总分,994.2118413343194,空腹血糖、血尿酸、年龄组、吸烟史、饮酒史,hyperlipidemia ~ fbg + uric_acid + C(age_group) + smoking + drinking
+模型B_不含直接血脂指标,5,删除变量,空腹血糖,993.343302406273,血尿酸、年龄组、吸烟史、饮酒史,hyperlipidemia ~ uric_acid + C(age_group) + smoking + drinking
+模型B_不含直接血脂指标,6,删除变量,饮酒史,992.949045592757,血尿酸、年龄组、吸烟史,hyperlipidemia ~ uric_acid + C(age_group) + smoking

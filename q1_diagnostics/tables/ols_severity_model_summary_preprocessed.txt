@@ -1,0 +1,33 @@
+                            OLS Regression Results                            
+==============================================================================
+Dep. Variable:        phlegm_dampness   R-squared:                       0.005
+Model:                            OLS   Adj. R-squared:                 -0.004
+Method:                 Least Squares   F-statistic:                    0.5500
+Date:                Sun, 19 Apr 2026   Prob (F-statistic):              0.838
+Time:                        04:04:24   Log-Likelihood:                -4418.2
+No. Observations:                1000   AIC:                             8856.
+Df Residuals:                     990   BIC:                             8906.
+Df Model:                           9                                         
+Covariance Type:            nonrobust                                         
+==============================================================================
+                 coef    std err          t      P>|t|      [0.025      0.975]
+------------------------------------------------------------------------------
+Intercept     32.9770      0.638     51.695      0.000      31.725      34.229
+hdl_c          0.1937      0.642      0.302      0.763      -1.067       1.454
+ldl_c          0.4548      0.646      0.704      0.482      -0.814       1.723
+tg            -0.3779      0.644     -0.587      0.558      -1.642       0.886
+tc            -0.8693      0.644     -1.350      0.177      -2.133       0.394
+fbg           -0.3569      0.639     -0.558      0.577      -1.611       0.897
+uric_acid      0.0003      0.640      0.000      1.000      -1.255       1.256
+bmi           -0.2010      0.641     -0.314      0.754      -1.459       1.057
+adl_total     -0.7593      0.639     -1.189      0.235      -2.013       0.494
+iadl_total     0.4732      0.640      0.740      0.460      -0.782       1.729
+==============================================================================
+Omnibus:                     1399.187   Durbin-Watson:                   2.000
+Prob(Omnibus):                  0.000   Jarque-Bera (JB):               69.044
+Skew:                           0.112   Prob(JB):                     1.02e-15
+Kurtosis:                       1.732   Cond. No.                         1.21
+==============================================================================
+
+Notes:
+[1] Standard Errors assume that the covariance matrix of the errors is correctly specified.

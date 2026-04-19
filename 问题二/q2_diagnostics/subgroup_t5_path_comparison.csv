@@ -1,0 +1,5 @@
+﻿path_slug,subgroup_n,positive_n,positive_rate,cart_high_risk_rule_count,apriori_rule_count,top1_interaction_pair,top2_interaction_pair,top3_interaction_pair
+path1_rf_calibrated,278,215,0.7733812949640287,2,1222,痰湿质 x TG（甘油三酯）,痰湿质 x 血尿酸,痰湿质 x TC（总胆固醇）
+path2_rf_calibrated,278,215,0.7733812949640287,2,378,痰湿质 x TG（甘油三酯）,痰湿质 x TC（总胆固醇）,痰湿质 x 血尿酸
+path1_rf_no_direct_lipids,278,215,0.7733812949640287,2,213,痰湿质 x 血尿酸,痰湿质 x IADL总分,痰湿质 x ADL总分
+path2_rf_no_direct_lipids,278,215,0.7733812949640287,2,34,痰湿质 x 血尿酸,痰湿质 x ADL总分,

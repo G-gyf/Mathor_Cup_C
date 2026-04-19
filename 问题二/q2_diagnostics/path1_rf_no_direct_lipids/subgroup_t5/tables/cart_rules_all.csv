@@ -1,0 +1,4 @@
+﻿leaf_node,rule,sample_count,negative_count,positive_count,positive_rate
+4,血尿酸 > 428.0000,98,0,98,1.0
+2,血尿酸 <= 428.0000 and 血尿酸 <= 157.5000,40,0,40,1.0
+3,血尿酸 <= 428.0000 and 血尿酸 > 157.5000,140,103,37,0.2642857142857143

@@ -1,0 +1,4 @@
+﻿leaf_node,rule,sample_count,negative_count,positive_count,positive_rate
+4,TG（甘油三酯） > 1.6974,142,0,142,1.0
+3,TG（甘油三酯） <= 1.6974 and TC（总胆固醇） > 6.1590,73,0,73,1.0
+2,TG（甘油三酯） <= 1.6974 and TC（总胆固醇） <= 6.1590,63,63,0,0.0

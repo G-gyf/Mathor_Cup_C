@@ -1,0 +1,3 @@
+﻿sample_id,stage_index,start_month,end_month,treatment_level,intensity,frequency,stage_start_score,stage_end_score,stage_cost
+104,1,1,5,1,1,9,58.0,46.09400405335519,690.0
+104,2,6,6,1,1,10,46.09400405335519,43.78930385068743,150.0
